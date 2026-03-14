@@ -1,4 +1,6 @@
-export default function TypingIndicator() {
+export default function TypingIndicator({ branding }) {
+  const dotColor = branding?.primaryColor || '#2563EB'
+
   return (
     <div
       style={{
@@ -8,13 +10,13 @@ export default function TypingIndicator() {
         padding: '8px 0',
       }}
     >
-      {/* Avatar */}
+      {/* Avatar — simple colored circle */}
       <div
         style={{
           width: 28,
           height: 28,
           borderRadius: '50%',
-          background: 'linear-gradient(135deg, #2563EB, #7C3AED)',
+          background: dotColor,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -45,7 +47,7 @@ export default function TypingIndicator() {
               width: 7,
               height: 7,
               borderRadius: '50%',
-              background: '#94A3B8',
+              background: dotColor,
               animation: 'bounce 1.2s ease infinite',
               animationDelay: `${i * 0.2}s`,
             }}

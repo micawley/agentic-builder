@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from 'react'
 import { StepTypeIcon } from '../../stepTypes'
 
 const ARROW = 14
@@ -6,14 +7,31 @@ function getHeaderClip(idx, total) {
   const isFirst = idx === 0
   const isLast = idx === total - 1
   if (total === 1) return 'none'
-  // Left notch: inward cut pointing RIGHT (previous arrow slots into it)
-  // Right arrow: outward point pointing RIGHT
   if (isFirst) return `polygon(0 0, calc(100% - ${ARROW}px) 0, 100% 50%, calc(100% - ${ARROW}px) 100%, 0 100%)`
   if (isLast)  return `polygon(0 0, 100% 0, 100% 100%, 0 100%, ${ARROW}px 50%)`
   return `polygon(0 0, calc(100% - ${ARROW}px) 0, 100% 50%, calc(100% - ${ARROW}px) 100%, 0 100%, ${ARROW}px 50%)`
 }
 
 export default function StagesPanel({ stages, activeStageId, activeStepId, completedSteps }) {
+  const prevActiveKeyRef = useRef(null)
+  const [flashKey, setFlashKey] = useState(null)
+  const flashTimerRef = useRef(null)
+
+  useEffect(() => {
+    const newKey = activeStageId && activeStepId ? `${activeStageId}:${activeStepId}` : null
+    const oldKey = prevActiveKeyRef.current
+    prevActiveKeyRef.current = newKey
+
+    // If the old active step is now in completedSteps, flash its checkmark
+    if (oldKey && oldKey !== newKey && completedSteps?.has(oldKey)) {
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current)
+      setFlashKey(oldKey)
+      flashTimerRef.current = setTimeout(() => setFlashKey(null), 700)
+    }
+
+    return () => { if (flashTimerRef.current) clearTimeout(flashTimerRef.current) }
+  }, [activeStageId, activeStepId, completedSteps])
+
   if (!stages || stages.length === 0) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94A3B8', fontSize: 14 }}>
@@ -39,7 +57,6 @@ export default function StagesPanel({ stages, activeStageId, activeStepId, compl
         const offset = dist * 50
         const opacity = dist <= -3 ? 0 : dist === -2 ? 0.25 : dist === -1 ? 0.5 : dist === 0 ? 1 : dist === 1 ? 0.5 : dist === 2 ? 0.25 : 0
         const headerColor = stage.green ? '#1D8740' : dist > 0 ? '#3B82F6' : '#1E3A5F'
-        // Earlier stages on top so their right arrow overlaps the next stage's left indent
         const zIndex = stages.length - idx
 
         return (
@@ -62,7 +79,7 @@ export default function StagesPanel({ stages, activeStageId, activeStepId, compl
               pointerEvents: opacity === 0 ? 'none' : 'auto',
             }}
           >
-            {/* Chevron stage header — clipPath handles both left indent and right arrow */}
+            {/* Chevron stage header */}
             <div
               style={{
                 background: headerColor,
@@ -94,7 +111,7 @@ export default function StagesPanel({ stages, activeStageId, activeStepId, compl
               <ThreeDots color="rgba(255,255,255,0.45)" />
             </div>
 
-            {/* Steps — white card sized to content, with side margin */}
+            {/* Steps */}
             {stage.steps.length > 0 && (
               <div
                 style={{
@@ -110,6 +127,9 @@ export default function StagesPanel({ stages, activeStageId, activeStepId, compl
                   const status = getStepStatus(stage.id, step.id)
                   const isActive = status === 'active'
                   const isCompleted = status === 'completed'
+                  const stepKey = `${stage.id}:${step.id}`
+                  const isFlashing = flashKey === stepKey
+
                   return (
                     <div
                       key={step.id}
@@ -121,12 +141,13 @@ export default function StagesPanel({ stages, activeStageId, activeStepId, compl
                         background: isActive ? '#F5F3FF' : '#F5F5F5',
                         borderRadius: 6,
                         margin: 8,
-                        borderLeft: `3px solid ${isActive ? '#A78BFA' : 'transparent'}`,
+                        borderLeft: `3px solid ${isActive ? '#A78BFA' : isCompleted && isFlashing ? '#22C55E' : 'transparent'}`,
+                        transition: 'background 0.3s ease, border-left-color 0.3s ease',
                       }}
                     >
                       <GripDots color="#D1D5DB" />
 
-                      {/* Step type icon with optional completed badge */}
+                      {/* Step icon with completion badge */}
                       <div style={{ position: 'relative', flexShrink: 0 }}>
                         <StepTypeIcon typeId={step.stepType} size={32} />
                         {isCompleted && (
@@ -143,6 +164,7 @@ export default function StagesPanel({ stages, activeStageId, activeStepId, compl
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
+                              animation: isFlashing ? 'checkmarkPop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1)' : 'none',
                             }}
                           >
                             <svg width="7" height="7" viewBox="0 0 10 10" fill="none">

@@ -1,10 +1,50 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import PhoneMockup from '../components/demo/PhoneMockup'
+import ContainerShell from '../components/demo/ContainerShell'
+import WebchatShell from '../components/demo/WebchatShell'
 import RightPanel from '../components/demo/RightPanel'
 import DemoNavBar from '../components/demo/DemoNavBar'
 import DemoSidebar from '../components/demo/DemoSidebar'
 import { useBuilder } from '../store/BuilderContext'
+
+function computeAutoSyncPanel(stages, botCount) {
+  if (!stages.length) return { mode: 'empty' }
+  let remaining = botCount
+  for (let si = 0; si < stages.length; si++) {
+    const stage = stages[si]
+    const steps = stage.steps || []
+    const stepCount = steps.length || 1
+    if (remaining < stepCount) {
+      return { mode: 'stages', stageId: stage.id, stepId: steps[remaining]?.id || '' }
+    }
+    remaining -= stepCount
+  }
+  const lastStage = stages[stages.length - 1]
+  const lastSteps = lastStage.steps || []
+  return { mode: 'stages', stageId: lastStage.id, stepId: lastSteps[lastSteps.length - 1]?.id || '' }
+}
+
+function computeAutoSyncCompleted(stages, botCount) {
+  const completed = new Set()
+  let remaining = botCount
+  for (let si = 0; si < stages.length; si++) {
+    const stage = stages[si]
+    const steps = stage.steps || []
+    const stepCount = steps.length || 1
+    if (remaining < stepCount) {
+      // current stage — steps before the active one are completed
+      for (let sti = 0; sti < remaining; sti++) {
+        if (steps[sti]) completed.add(`${stage.id}:${steps[sti].id}`)
+      }
+      break
+    }
+    // entire stage completed
+    for (const step of steps) completed.add(`${stage.id}:${step.id}`)
+    remaining -= stepCount
+  }
+  return completed
+}
 
 export default function DemoPage() {
   const { state: config } = useBuilder()
@@ -14,7 +54,9 @@ export default function DemoPage() {
   const [currentScene, setCurrentScene] = useState(0)
   const [animatingIdx, setAnimatingIdx] = useState(-1)
   const [botSpeaking, setBotSpeaking] = useState(false)
+  const [userSpeaking, setUserSpeaking] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [presenterMode, setPresenterMode] = useState(false)
   const timerRef = useRef(null)
   const botSpeakTimerRef = useRef(null)
   const botSpeakPollRef = useRef(null)
@@ -32,14 +74,14 @@ export default function DemoPage() {
 
   const playMessage = useCallback(async (msg, branding) => {
     audioEndedRef.current = false
-    if (!msg?.text || msg.speak === false) { audioEndedRef.current = true; return }
+    if (!msg?.text || msg.speak === false) { audioEndedRef.current = true; setUserSpeaking(false); return }
     const apiKey = branding?.elevenLabsApiKey
-    if (!apiKey) { audioEndedRef.current = true; return }
+    if (!apiKey) { audioEndedRef.current = true; setUserSpeaking(false); return }
     const voiceId = msg.type === 'bot'
       ? (branding.botVoiceId || 'cjVigY5qzO86Huf0OWal')
       : (branding.customerVoiceId || 'EXAVITQu4vr4xnSDxMaL')
     stopAudio()
-    const onEnd = () => { audioEndedRef.current = true }
+    const onEnd = () => { audioEndedRef.current = true; setUserSpeaking(false) }
     const cacheKey = msg.id
     if (audioCacheRef.current.has(cacheKey)) {
       const audio = new Audio(audioCacheRef.current.get(cacheKey))
@@ -57,7 +99,7 @@ export default function DemoPage() {
       if (!res.ok) {
         const errText = await res.text().catch(() => res.status)
         console.error('[ElevenLabs] TTS error', res.status, errText)
-        audioEndedRef.current = true
+        audioEndedRef.current = true; setUserSpeaking(false)
         return
       }
       const url = URL.createObjectURL(await res.blob())
@@ -66,16 +108,27 @@ export default function DemoPage() {
       audioRef.current = audio
       audio.addEventListener('ended', onEnd)
       audio.play()
-    } catch (e) { console.error('[ElevenLabs] fetch error', e); audioEndedRef.current = true }
-  }, [stopAudio])
+    } catch (e) { console.error('[ElevenLabs] fetch error', e); audioEndedRef.current = true; setUserSpeaking(false) }
+  }, [stopAudio, setUserSpeaking])
 
   const messages = useMemo(() => config?.messages || [], [config])
   const total = messages.length
 
   const shownMessages = messages.slice(0, currentScene)
 
-  const currentPanel =
-    currentScene > 0 ? messages[currentScene - 1]?.panel : { mode: 'empty' }
+  const showBotTyping = animatingIdx >= 0 && messages[animatingIdx]?.type === 'bot'
+
+  const jumpToScene = useCallback((n) => {
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
+    if (autoPlayTimerRef.current) { clearTimeout(autoPlayTimerRef.current); autoPlayTimerRef.current = null }
+    setAnimatingIdx(-1)
+    setIsPlaying(false)
+    stopAudio()
+    audioEndedRef.current = true
+    setBotSpeaking(false)
+    setUserSpeaking(false)
+    setCurrentScene(n)
+  }, [stopAudio, setUserSpeaking])
 
   const goReset = useCallback(() => {
     if (autoPlayTimerRef.current) { clearTimeout(autoPlayTimerRef.current); autoPlayTimerRef.current = null }
@@ -85,12 +138,21 @@ export default function DemoPage() {
     stopAudio()
     audioEndedRef.current = true
     setBotSpeaking(false)
+    setUserSpeaking(false)
     setCurrentScene(0)
-  }, [stopAudio])
+  }, [stopAudio, setUserSpeaking])
 
   const goNext = useCallback(() => {
     if (currentScene >= total) return
     if (timerRef.current) return // animation in progress
+
+    // Cancel any pending auto-play timer so a manual advance can't race with it
+    if (autoPlayTimerRef.current) { clearTimeout(autoPlayTimerRef.current); autoPlayTimerRef.current = null }
+
+    // Stop stale audio from a previous scene
+    stopAudio()
+    audioEndedRef.current = true
+    setUserSpeaking(false)
 
     // Clear bot speaking indicator immediately on every advance
     if (botSpeakTimerRef.current) clearTimeout(botSpeakTimerRef.current)
@@ -110,7 +172,7 @@ export default function DemoPage() {
     } else {
       setCurrentScene((s) => s + 1)
     }
-  }, [currentScene, total, messages, setBotSpeaking])
+  }, [currentScene, total, messages, setBotSpeaking, stopAudio, setUserSpeaking])
 
   const goPrev = useCallback(() => {
     if (currentScene === 0) return
@@ -120,23 +182,26 @@ export default function DemoPage() {
       setAnimatingIdx(-1)
     }
     stopAudio()
+    setUserSpeaking(false)
     setCurrentScene((s) => s - 1)
-  }, [currentScene, stopAudio])
+  }, [currentScene, stopAudio, setUserSpeaking])
 
   useEffect(() => {
     if (currentScene === 0 || !messages.length || !config) return
     const msg = messages[currentScene - 1]
+    if (msg?.type === 'user') setUserSpeaking(true)
     playMessage(msg, config.branding)
-  }, [currentScene, config, messages, playMessage])
+  }, [currentScene, config, messages, playMessage, setUserSpeaking])
 
   useEffect(() => {
     const handleKey = (e) => {
       if (e.key === 'ArrowRight') goNext()
       if (e.key === 'ArrowLeft') goPrev()
+      if (e.key === ' ') { e.preventDefault(); setIsPlaying(p => { if (p) { stopAudio(); audioEndedRef.current = true } return !p }) }
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [goNext, goPrev])
+  }, [goNext, goPrev, stopAudio])
 
   // Clamp currentScene if messages are removed via sidebar
   useEffect(() => {
@@ -170,8 +235,10 @@ export default function DemoPage() {
   }, [botSpeaking, isPlaying])
 
   // Re-play current message TTS when resuming auto-play (isPlaying: false → true)
+  // Skip if audio is already in progress (e.g. manual goNext triggered a scene change simultaneously)
   useEffect(() => {
     if (!isPlaying) return
+    if (!audioEndedRef.current) return
     if (currentScene > 0 && animatingIdx < 0) {
       playMessage(messages[currentScene - 1], config?.branding)
     }
@@ -188,10 +255,18 @@ export default function DemoPage() {
         autoPlayTimerRef.current = setTimeout(check, 300)
         return
       }
+      // voicetotext: wait for justSent animation (1400ms) + 200ms = 1600ms
+      // text: bubble appears immediately when audio ends, 1500ms standard pause
+      // all others: standard 1500ms read pause
+      const currentMsg = messages[currentScene - 1]
+      const style = branding?.phoneInputStyle
+      const speed = branding?.playbackSpeed || 1
+      const baseDelay = currentMsg?.type === 'user' && style === 'voicetotext' ? 1600 : 1500
+      const delay = Math.round(baseDelay / speed)
       autoPlayTimerRef.current = setTimeout(() => {
         autoPlayTimerRef.current = null
         goNext()
-      }, 1500)
+      }, delay)
     }
     autoPlayTimerRef.current = setTimeout(check, 300)
     return () => { if (autoPlayTimerRef.current) { clearTimeout(autoPlayTimerRef.current); autoPlayTimerRef.current = null } }
@@ -208,6 +283,21 @@ export default function DemoPage() {
       cache.forEach((url) => URL.revokeObjectURL(url))
     }
   }, [stopAudio])
+
+  // Presenter mode fullscreen
+  useEffect(() => {
+    if (presenterMode) {
+      document.documentElement.requestFullscreen?.().catch(() => {})
+    } else {
+      if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {})
+    }
+  }, [presenterMode])
+
+  useEffect(() => {
+    const handler = () => { if (!document.fullscreenElement) setPresenterMode(false) }
+    document.addEventListener('fullscreenchange', handler)
+    return () => document.removeEventListener('fullscreenchange', handler)
+  }, [])
 
   if (error) {
     return (
@@ -288,14 +378,34 @@ export default function DemoPage() {
   const branding = config?.branding || {}
   const stages = config.stages || []
 
-  // Resolve effective panel mode (walk back past 'same' entries)
-  const effectiveMode = (() => {
-    for (let i = currentScene - 1; i >= 0; i--) {
-      const mode = messages[i]?.panel?.mode
-      if (mode && mode !== 'same') return mode
-    }
-    return 'empty'
-  })()
+  const stepsSoFar = shownMessages.filter(m => m.advanceStep).length +
+    (animatingIdx >= 0 && messages[animatingIdx]?.advanceStep ? 1 : 0)
+
+  const currentPanel = branding.autoSyncStages && stages.length > 0
+    ? computeAutoSyncPanel(stages, stepsSoFar)
+    : (currentScene > 0 ? messages[currentScene - 1]?.panel : { mode: 'empty' })
+
+  const autoSyncCompletedSteps = branding.autoSyncStages && stages.length > 0
+    ? computeAutoSyncCompleted(stages, stepsSoFar)
+    : null
+
+  // Overlay: badges/caseSearch that float over the auto-synced stages panel
+  const currentMsgPanel = currentScene > 0 ? messages[currentScene - 1]?.panel : null
+  const extrasPanel = branding.autoSyncStages && stages.length > 0 &&
+    (currentMsgPanel?.mode === 'badges' || currentMsgPanel?.mode === 'caseSearch')
+    ? currentMsgPanel
+    : null
+
+  const effectiveMode = branding.autoSyncStages && stages.length > 0
+    ? 'stages'
+    : (() => {
+        for (let i = currentScene - 1; i >= 0; i--) {
+          const mode = messages[i]?.panel?.mode
+          if (mode && mode !== 'same') return mode
+        }
+        return 'empty'
+      })()
+
   const hasContent = effectiveMode !== 'empty'
 
   return (
@@ -304,7 +414,9 @@ export default function DemoPage() {
         height: '100vh',
         display: 'flex',
         flexDirection: 'column',
-        background: `linear-gradient(135deg, ${branding.primaryColor}18 0%, ${branding.accentColor}12 100%), #E8EEF7`,
+        background: branding.demoBackground
+          ? branding.demoBackground
+          : `linear-gradient(135deg, ${branding.primaryColor}18 0%, ${branding.accentColor}12 100%), #E8EEF7`,
         overflow: 'hidden',
       }}
     >
@@ -333,55 +445,40 @@ export default function DemoPage() {
             zIndex: 2,
           }}
         >
-          {/* Bot speaking indicator — above phone */}
-          {branding.showSpeakingPill !== false && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 6,
-                background: '#fff',
-                borderRadius: 20,
-                padding: '6px 14px 6px 10px',
-                boxShadow: '0 2px 10px rgba(0,0,0,0.08)',
-                marginBottom: 12,
-                opacity: botSpeaking ? 1 : 0,
-                transition: 'opacity 0.3s ease',
-                pointerEvents: 'none',
-              }}
-            >
-              <div style={{
-                width: 22, height: 22, borderRadius: '50%',
-                background: branding.primaryColor || '#2563EB',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-              }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
-                  <path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                    stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                {[4, 8, 11, 8, 4].map((h, i) => (
-                  <div key={i} style={{
-                    width: 3, height: h, borderRadius: 2,
-                    background: branding.primaryColor || '#2563EB',
-                    animation: botSpeaking ? `voiceBar 0.8s ease-in-out ${i * 0.12}s infinite alternate` : 'none',
-                  }} />
-                ))}
-              </div>
-              <span style={{ fontSize: 11, fontWeight: 600, color: '#64748B', whiteSpace: 'nowrap' }}>
-                {branding.speakingPillLabel || branding.botName || 'Assistant'}
-              </span>
-            </div>
+          {(branding.shell || 'phone') === 'phone' && (
+            <PhoneMockup
+              branding={branding}
+              messages={shownMessages}
+              animatingIdx={animatingIdx}
+              botSpeaking={botSpeaking}
+              userSpeaking={userSpeaking}
+              isPlaying={isPlaying}
+              showBotTyping={showBotTyping}
+              onMessageClick={(id) => { setIsPlaying(false); setScrollToId(id); setSidebarOpen(true) }}
+            />
           )}
-
-          <PhoneMockup
-            branding={branding}
-            messages={shownMessages}
-            animatingIdx={animatingIdx}
-            onMessageClick={(id) => { setIsPlaying(false); setScrollToId(id); setSidebarOpen(true) }}
-          />
+          {branding.shell === 'container' && (
+            <ContainerShell
+              branding={branding}
+              messages={shownMessages}
+              animatingIdx={animatingIdx}
+              botSpeaking={botSpeaking}
+              userSpeaking={userSpeaking}
+              showBotTyping={showBotTyping}
+              onMessageClick={(id) => { setIsPlaying(false); setScrollToId(id); setSidebarOpen(true) }}
+            />
+          )}
+          {branding.shell === 'webchat' && (
+            <WebchatShell
+              branding={branding}
+              messages={shownMessages}
+              animatingIdx={animatingIdx}
+              botSpeaking={botSpeaking}
+              userSpeaking={userSpeaking}
+              showBotTyping={showBotTyping}
+              onMessageClick={(id) => { setIsPlaying(false); setScrollToId(id); setSidebarOpen(true) }}
+            />
+          )}
         </div>
 
         {/* Right: Panel canvas — slides in when content present */}
@@ -461,6 +558,8 @@ export default function DemoPage() {
               stages={stages}
               currentScene={currentScene}
               allMessages={messages}
+              completedSteps={autoSyncCompletedSteps}
+              extrasPanel={extrasPanel}
             />
           </div>
         </div>
@@ -479,10 +578,16 @@ export default function DemoPage() {
             return !p
           })
         }}
-        onOpenSettings={() => setSidebarOpen(true)}
+        onOpenSettings={() => { if (!presenterMode) setSidebarOpen(true) }}
+        presenterMode={presenterMode}
+        onTogglePresenter={() => setPresenterMode(p => !p)}
+        nextMessage={messages[currentScene]}
+        onJumpToScene={jumpToScene}
       />
 
-      <DemoSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} scrollToId={scrollToId} onScrolled={() => setScrollToId(null)} />
+      {!presenterMode && (
+        <DemoSidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} scrollToId={scrollToId} onScrolled={() => setScrollToId(null)} />
+      )}
     </div>
   )
 }

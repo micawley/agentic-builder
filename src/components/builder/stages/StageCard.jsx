@@ -25,6 +25,15 @@ export default function StageCard({ stage, index }) {
           borderBottom: stage.steps.length > 0 ? '1px solid #E2E8F0' : 'none',
         }}
       >
+        {/* Drag handle */}
+        <svg width="10" height="14" viewBox="0 0 10 14" fill="none" style={{ flexShrink: 0, opacity: 0.3, cursor: 'grab' }}>
+          <circle cx="2"  cy="2"  r="1.5" fill="#64748B" />
+          <circle cx="8"  cy="2"  r="1.5" fill="#64748B" />
+          <circle cx="2"  cy="7"  r="1.5" fill="#64748B" />
+          <circle cx="8"  cy="7"  r="1.5" fill="#64748B" />
+          <circle cx="2"  cy="12" r="1.5" fill="#64748B" />
+          <circle cx="8"  cy="12" r="1.5" fill="#64748B" />
+        </svg>
         <div
           style={{
             width: 28,

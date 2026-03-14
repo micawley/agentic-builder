@@ -1,12 +1,26 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useBuilder } from '../../store/BuilderContext'
 
 export default function BuilderHeader() {
-  const { state, importConfig } = useBuilder()
+  const { state, importConfig, undo, redo, canUndo, canRedo } = useBuilder()
   const navigate = useNavigate()
   const importRef = useRef(null)
   const [importError, setImportError] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(false)
+
+  // Keyboard shortcuts: Ctrl/Cmd+Z = undo, Ctrl/Cmd+Shift+Z or Ctrl+Y = redo
+  useEffect(() => {
+    const handler = (e) => {
+      const mod = e.metaKey || e.ctrlKey
+      if (!mod) return
+      if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
+      if (e.key === 'z' && e.shiftKey)  { e.preventDefault(); redo() }
+      if (e.key === 'y')                 { e.preventDefault(); redo() }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [undo, redo])
 
   const handleLaunch = () => {
     navigate('/demo', { state: { config: state } })
@@ -30,7 +44,6 @@ export default function BuilderHeader() {
     reader.onload = (evt) => {
       try {
         const parsed = JSON.parse(evt.target.result)
-        // Basic validation
         if (!parsed.branding || !Array.isArray(parsed.stages) || !Array.isArray(parsed.messages)) {
           throw new Error('Invalid config')
         }
@@ -42,9 +55,23 @@ export default function BuilderHeader() {
       }
     }
     reader.readAsText(file)
-    // Reset so the same file can be re-imported if needed
     e.target.value = ''
   }
+
+  const iconBtnStyle = (disabled) => ({
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    border: '1px solid #E2E8F0',
+    background: disabled ? '#F8FAFC' : '#fff',
+    color: disabled ? '#CBD5E1' : '#64748B',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.15s',
+    flexShrink: 0,
+  })
 
   return (
     <header
@@ -82,7 +109,54 @@ export default function BuilderHeader() {
       </div>
 
       {/* Actions */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+
+        {/* Undo / Redo */}
+        <div style={{ display: 'flex', gap: 4, marginRight: 4 }}>
+          <button
+            onClick={undo}
+            disabled={!canUndo}
+            title="Undo (Ctrl+Z)"
+            style={iconBtnStyle(!canUndo)}
+            onMouseOver={(e) => { if (canUndo) e.currentTarget.style.borderColor = '#CBD5E1' }}
+            onMouseOut={(e) => { if (canUndo) e.currentTarget.style.borderColor = '#E2E8F0' }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <path d="M3 7h13a5 5 0 010 10H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M7 3L3 7l4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <button
+            onClick={redo}
+            disabled={!canRedo}
+            title="Redo (Ctrl+Shift+Z)"
+            style={iconBtnStyle(!canRedo)}
+            onMouseOver={(e) => { if (canRedo) e.currentTarget.style.borderColor = '#CBD5E1' }}
+            onMouseOut={(e) => { if (canRedo) e.currentTarget.style.borderColor = '#E2E8F0' }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <path d="M21 7H8a5 5 0 000 10h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M17 3l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Shortcut reference */}
+        <button
+          onClick={() => setShowShortcuts(true)}
+          title="Keyboard shortcuts"
+          style={iconBtnStyle(false)}
+          onMouseOver={(e) => { e.currentTarget.style.borderColor = '#CBD5E1' }}
+          onMouseOut={(e) => { e.currentTarget.style.borderColor = '#E2E8F0' }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+            <path d="M12 17v-5M12 8v-.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </button>
+
+        {/* Divider */}
+        <div style={{ width: 1, height: 24, background: '#E2E8F0', marginRight: 4 }} />
 
         {/* Import */}
         <input ref={importRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImport} />
@@ -174,6 +248,59 @@ export default function BuilderHeader() {
           Generate &amp; Launch Demo
         </button>
       </div>
+
+      {/* Keyboard shortcuts modal */}
+      {showShortcuts && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => setShowShortcuts(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: '#fff', borderRadius: 18, width: 480, boxShadow: '0 20px 60px rgba(0,0,0,0.18)', overflow: 'hidden' }}
+          >
+            <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: '#1E293B' }}>Keyboard Shortcuts</h3>
+              <button onClick={() => setShowShortcuts(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+              </button>
+            </div>
+            <div style={{ padding: '16px 24px 24px', display: 'flex', gap: 24 }}>
+              {[
+                {
+                  title: 'Builder',
+                  rows: [
+                    ['Ctrl / ⌘ + Z', 'Undo'],
+                    ['Ctrl / ⌘ + Shift + Z', 'Redo'],
+                    ['Ctrl / ⌘ + Y', 'Redo'],
+                  ],
+                },
+                {
+                  title: 'Demo playback',
+                  rows: [
+                    ['→ Arrow Right', 'Next message'],
+                    ['← Arrow Left', 'Previous message'],
+                    ['Space', 'Play / Pause'],
+                    ['Click scene counter', 'Jump to scene'],
+                  ],
+                },
+              ].map(({ title, rows }) => (
+                <div key={title} style={{ flex: 1 }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 10 }}>{title}</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {rows.map(([key, label]) => (
+                      <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                        <span style={{ fontSize: 12, color: '#64748B' }}>{label}</span>
+                        <kbd style={{ fontSize: 11, background: '#F1F5F9', border: '1px solid #E2E8F0', borderRadius: 6, padding: '3px 8px', color: '#475569', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{key}</kbd>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   )
 }

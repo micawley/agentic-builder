@@ -4,13 +4,46 @@ import StageCard from './StageCard'
 import StageImportModal from './StageImportModal'
 
 export default function StagesTab() {
-  const { state, addStage } = useBuilder()
+  const { state, addStage, reorderStages } = useBuilder()
   const { stages } = state
   const [showImport, setShowImport] = useState(false)
+  const [dragIdx, setDragIdx] = useState(null)
+  const [dragOverIdx, setDragOverIdx] = useState(null)
+
+  const handleDragStart = (e, idx) => {
+    setDragIdx(idx)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleDragOver = (e, idx) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (idx !== dragIdx) setDragOverIdx(idx)
+  }
+
+  const handleDrop = (e, idx) => {
+    e.preventDefault()
+    if (dragIdx !== null && dragIdx !== idx) reorderStages(dragIdx, idx)
+    setDragIdx(null)
+    setDragOverIdx(null)
+  }
+
+  const handleDragEnd = () => {
+    setDragIdx(null)
+    setDragOverIdx(null)
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {showImport && <StageImportModal onClose={() => setShowImport(false)} />}
+
+      {state.branding.autoSyncStages && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#EFF6FF', borderRadius: 8, padding: '8px 12px', border: '1px solid #BFDBFE' }}>
+          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#2563EB', flexShrink: 0 }} />
+          <span style={{ fontSize: 12, fontWeight: 600, color: '#1D4ED8' }}>Auto-sync active</span>
+          <span style={{ fontSize: 12, color: '#60A5FA' }}>— mark steps in the Conversation tab</span>
+        </div>
+      )}
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
@@ -23,17 +56,10 @@ export default function StagesTab() {
           <button
             onClick={() => setShowImport(true)}
             style={{
-              background: '#fff',
-              color: '#7C3AED',
-              border: '1.5px solid #DDD6FE',
-              borderRadius: 10,
-              padding: '9px 14px',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 7,
+              background: '#fff', color: '#7C3AED',
+              border: '1.5px solid #DDD6FE', borderRadius: 10,
+              padding: '9px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 7,
               boxShadow: '0 1px 4px rgba(124,58,237,0.1)',
             }}
           >
@@ -47,16 +73,9 @@ export default function StagesTab() {
             onClick={addStage}
             style={{
               background: 'linear-gradient(135deg, #2563EB, #1D4ED8)',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 10,
-              padding: '10px 18px',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
+              color: '#fff', border: 'none', borderRadius: 10,
+              padding: '10px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 8,
               boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
             }}
           >
@@ -69,60 +88,19 @@ export default function StagesTab() {
       </div>
 
       {stages.length === 0 ? (
-        <div
-          style={{
-            background: '#fff',
-            borderRadius: 16,
-            padding: 48,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 12,
-            border: '2px dashed #E2E8F0',
-          }}
-        >
-          <div
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: 14,
-              background: '#F1F5F9',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
+        <div style={{ background: '#fff', borderRadius: 16, padding: 48, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, border: '2px dashed #E2E8F0' }}>
+          <div style={{ width: 56, height: 56, borderRadius: 14, background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                stroke="#94A3B8"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
+              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke="#94A3B8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
           <div style={{ textAlign: 'center' }}>
             <p style={{ fontWeight: 600, color: '#1E293B', marginBottom: 4 }}>No stages yet</p>
-            <p style={{ fontSize: 13, color: '#94A3B8' }}>
-              Add a stage manually or import from a screenshot
-            </p>
+            <p style={{ fontSize: 13, color: '#94A3B8' }}>Add a stage manually or import from a screenshot</p>
           </div>
           <button
             onClick={() => setShowImport(true)}
-            style={{
-              background: '#F5F3FF',
-              color: '#7C3AED',
-              border: '1.5px dashed #C4B5FD',
-              borderRadius: 10,
-              padding: '8px 16px',
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
+            style={{ background: '#F5F3FF', color: '#7C3AED', border: '1.5px dashed #C4B5FD', borderRadius: 10, padding: '8px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
               <rect x="3" y="3" width="18" height="18" rx="3" stroke="#7C3AED" strokeWidth="2" />
@@ -134,7 +112,23 @@ export default function StagesTab() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {stages.map((stage, index) => (
-            <StageCard key={stage.id} stage={stage} index={index} />
+            <div
+              key={stage.id}
+              draggable
+              onDragStart={(e) => handleDragStart(e, index)}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDrop={(e) => handleDrop(e, index)}
+              onDragEnd={handleDragEnd}
+              style={{
+                opacity: dragIdx === index ? 0.4 : 1,
+                outline: dragOverIdx === index && dragIdx !== index ? '2px solid #2563EB' : 'none',
+                borderRadius: 14,
+                transition: 'opacity 0.15s, outline 0.1s',
+                cursor: 'grab',
+              }}
+            >
+              <StageCard stage={stage} index={index} />
+            </div>
           ))}
         </div>
       )}

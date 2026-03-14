@@ -2,24 +2,22 @@ import { useEffect, useRef } from 'react'
 import MessageBubble from './MessageBubble'
 import TypingIndicator from './TypingIndicator'
 
-export default function ChatArea({ messages, animatingIdx, branding, onMessageClick }) {
+export default function ChatArea({ messages, animatingIdx, branding, onMessageClick, topPad = 0, showBotTyping = false, disableAutoScroll = false }) {
   const bottomRef = useRef(null)
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, animatingIdx])
-
-  const showTyping =
-    animatingIdx > -1 &&
-    animatingIdx < messages.length + 1 &&
-    messages[animatingIdx]?.type === 'bot'
+    if (!disableAutoScroll) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages.length, animatingIdx, disableAutoScroll])
 
   return (
     <div
       style={{
         flex: 1,
         overflowY: 'auto',
-        padding: '12px 14px',
+        paddingTop: topPad + 12,
+        paddingBottom: 12,
+        paddingLeft: 14,
+        paddingRight: 14,
         display: 'flex',
         flexDirection: 'column',
         gap: 4,
@@ -35,7 +33,7 @@ export default function ChatArea({ messages, animatingIdx, branding, onMessageCl
         />
       ))}
 
-      {showTyping && <TypingIndicator />}
+      {showBotTyping && <TypingIndicator branding={branding} />}
 
       <div ref={bottomRef} />
     </div>

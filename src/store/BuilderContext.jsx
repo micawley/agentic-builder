@@ -1,11 +1,15 @@
 import { createContext, useContext, useReducer, useEffect } from 'react'
 
 const STORAGE_KEY = 'demoBuilderState'
+const MAX_HISTORY = 50
 
 function loadSavedState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : null
+    if (!raw) return null
+    const saved = JSON.parse(raw)
+    // Merge with initialState so newly-added top-level fields always exist
+    return { ...initialState, ...saved, branding: { ...initialState.branding, ...saved.branding } }
   } catch {
     return null
   }
@@ -14,6 +18,7 @@ function loadSavedState() {
 const genId = (prefix) => `${prefix}_${Date.now()}${Math.random().toString(36).slice(2, 5)}`
 
 const initialState = {
+  presets: [],
   branding: {
     logo: null,
     customerAvatar: null,
@@ -29,6 +34,16 @@ const initialState = {
     showActivePill: true,
     showSpeakingPill: true,
     speakingPillLabel: '',
+    splashTitle: 'Agentic AI',
+    splashSubtitle: 'Powered by Pega',
+    splashLogo: null,
+    shell: 'phone',
+    phoneInputStyle: 'voice',
+    poweredByLabel: 'PEGA',
+    autoSyncStages: false,
+    demoBackground: null,
+    darkShell: false,
+    playbackSpeed: 1,
   },
   stages: [],
   messages: [],
@@ -133,6 +148,7 @@ function reducer(state, action) {
         type: action.msgType,
         text: '',
         speak: true,
+        advanceStep: false,
         panel: { mode: 'same', badges: [], caseSearch: { category: '', types: [], match: '', badges: [], isNew: true }, stageId: '', stepId: '' },
       }
       const msgs = [...state.messages]
@@ -157,10 +173,23 @@ function reducer(state, action) {
             type: action.msgType,
             text: '',
             speak: true,
+            advanceStep: false,
             panel: { mode: 'same', badges: [], caseSearch: { category: '', types: [], match: '', badges: [], isNew: true }, stageId: '', stepId: '' },
           },
         ],
       }
+
+    case 'BULK_ADD_MESSAGES': {
+      const newMsgs = action.messages.map((m) => ({
+        id: genId('msg'),
+        type: m.type === 'user' ? 'user' : 'bot',
+        text: m.text || '',
+        speak: true,
+        advanceStep: false,
+        panel: { mode: 'same', badges: [], caseSearch: { category: '', types: [], match: '', badges: [], isNew: true }, stageId: '', stepId: '' },
+      }))
+      return { ...state, messages: [...state.messages, ...newMsgs] }
+    }
 
     case 'REMOVE_MESSAGE':
       return { ...state, messages: state.messages.filter((m) => m.id !== action.id) }
@@ -329,6 +358,24 @@ function reducer(state, action) {
         ),
       }
 
+    case 'REORDER_STAGES': {
+      const arr = [...state.stages]
+      const [item] = arr.splice(action.from, 1)
+      arr.splice(action.to, 0, item)
+      return { ...state, stages: arr }
+    }
+
+    case 'SAVE_PRESET': {
+      const preset = { id: genId('preset'), name: action.name, branding: { ...state.branding } }
+      return { ...state, presets: [...(state.presets || []), preset] }
+    }
+
+    case 'LOAD_PRESET':
+      return { ...state, branding: { ...state.branding, ...action.branding } }
+
+    case 'DELETE_PRESET':
+      return { ...state, presets: state.presets.filter((p) => p.id !== action.id) }
+
     case 'IMPORT_CONFIG':
       return action.config
 
@@ -337,10 +384,48 @@ function reducer(state, action) {
   }
 }
 
+// History-aware meta-reducer
+function historyReducer({ past, present, future }, action) {
+  if (action.type === 'UNDO') {
+    if (past.length === 0) return { past, present, future }
+    return {
+      past: past.slice(0, -1),
+      present: past[past.length - 1],
+      future: [present, ...future].slice(0, MAX_HISTORY),
+    }
+  }
+  if (action.type === 'REDO') {
+    if (future.length === 0) return { past, present, future }
+    return {
+      past: [...past, present].slice(-MAX_HISTORY),
+      present: future[0],
+      future: future.slice(1),
+    }
+  }
+  // IMPORT_CONFIG resets history
+  if (action.type === 'IMPORT_CONFIG') {
+    return { past: [], present: reducer(present, action), future: [] }
+  }
+  const newPresent = reducer(present, action)
+  if (newPresent === present) return { past, present, future }
+  return {
+    past: [...past, present].slice(-MAX_HISTORY),
+    present: newPresent,
+    future: [],
+  }
+}
+
 const BuilderContext = createContext(null)
 
 export function BuilderProvider({ children }) {
-  const [state, dispatch] = useReducer(reducer, loadSavedState() ?? initialState)
+  const [{ past, present: state, future }, dispatch] = useReducer(
+    historyReducer,
+    null,
+    () => ({ past: [], present: loadSavedState() ?? initialState, future: [] })
+  )
+
+  const canUndo = past.length > 0
+  const canRedo = future.length > 0
 
   useEffect(() => {
     try {
@@ -351,6 +436,8 @@ export function BuilderProvider({ children }) {
   }, [state])
 
   const actions = {
+    undo: () => dispatch({ type: 'UNDO' }),
+    redo: () => dispatch({ type: 'REDO' }),
     setBranding: (updates) => dispatch({ type: 'SET_BRANDING', updates }),
     setLogo: (base64) => dispatch({ type: 'SET_LOGO', base64 }),
     addStage: () => dispatch({ type: 'ADD_STAGE' }),
@@ -367,6 +454,7 @@ export function BuilderProvider({ children }) {
     insertMessage: (index, msgType) => dispatch({ type: 'INSERT_MESSAGE', index, msgType }),
     reorderMessages: (from, to) => dispatch({ type: 'REORDER_MESSAGES', from, to }),
     addMessage: (msgType) => dispatch({ type: 'ADD_MESSAGE', msgType }),
+    bulkAddMessages: (messages) => dispatch({ type: 'BULK_ADD_MESSAGES', messages }),
     removeMessage: (id) => dispatch({ type: 'REMOVE_MESSAGE', id }),
     updateMessage: (id, updates) => dispatch({ type: 'UPDATE_MESSAGE', id, updates }),
     updatePanelMode: (msgId, mode) => dispatch({ type: 'UPDATE_PANEL_MODE', msgId, mode }),
@@ -380,11 +468,15 @@ export function BuilderProvider({ children }) {
       dispatch({ type: 'UPDATE_CASE_SEARCH', msgId, field, val }),
     updateStageStep: (msgId, stageId, stepId) =>
       dispatch({ type: 'UPDATE_STAGE_STEP', msgId, stageId, stepId }),
+    reorderStages: (from, to) => dispatch({ type: 'REORDER_STAGES', from, to }),
+    savePreset: (name) => dispatch({ type: 'SAVE_PRESET', name }),
+    loadPreset: (branding) => dispatch({ type: 'LOAD_PRESET', branding }),
+    deletePreset: (id) => dispatch({ type: 'DELETE_PRESET', id }),
     importConfig: (config) => dispatch({ type: 'IMPORT_CONFIG', config }),
   }
 
   return (
-    <BuilderContext.Provider value={{ state, ...actions }}>
+    <BuilderContext.Provider value={{ state, canUndo, canRedo, ...actions }}>
       {children}
     </BuilderContext.Provider>
   )

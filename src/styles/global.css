@@ -31,6 +31,28 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+@keyframes overlayFadeIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+
+@keyframes checkmarkPop {
+  0%   { transform: scale(0); opacity: 0; }
+  55%  { transform: scale(1.35); opacity: 1; }
+  75%  { transform: scale(0.88); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes panelEnter {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
+@keyframes panelExit {
+  from { opacity: 1; transform: translateY(0)     scale(1); }
+  to   { opacity: 0; transform: translateY(-8px)  scale(0.97); }
+}
+
 @keyframes fadeSlideUp {
   from {
     opacity: 0;
@@ -76,6 +98,29 @@ body {
 @keyframes voiceBar {
   from { transform: scaleY(0.4); opacity: 0.2; }
   to   { transform: scaleY(1);   opacity: 0.45; }
+}
+
+@keyframes speakingRipple {
+  0% { transform: scale(1); opacity: 0.5; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+
+@keyframes speakingGlow {
+  0%, 100% { box-shadow: 0 0 0 0 var(--speaking-color, rgba(124,58,237,0.4)); }
+  50% { box-shadow: 0 0 28px 10px var(--speaking-color, rgba(124,58,237,0.4)); }
+}
+
+@keyframes speakingBounce {
+  0%, 100% { transform: translateY(0); }
+  18%       { transform: translateY(-5px); }
+  36%       { transform: translateY(0); }
+  54%       { transform: translateY(-3px); }
+  72%       { transform: translateY(0); }
+}
+
+@keyframes textCursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }
 
 @keyframes badgeShadowPulse {

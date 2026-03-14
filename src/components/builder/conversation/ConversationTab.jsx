@@ -172,7 +172,7 @@ function estimateDuration(messages) {
 }
 
 export default function ConversationTab({ scrollToId, onScrolled }) {
-  const { state, addMessage, insertMessage, reorderMessages, setBranding, bulkAddMessages } = useBuilder()
+  const { state, addMessage, insertMessage, reorderMessages, setBranding, bulkAddMessages, updateMessage, replaceInMessages } = useBuilder()
   const { messages } = state
   const autoSync = state.branding.autoSyncStages
 
@@ -180,6 +180,8 @@ export default function ConversationTab({ scrollToId, onScrolled }) {
   const [dragOverIdx, setDragOverIdx] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchMatchIdx, setSearchMatchIdx] = useState(0)
+  const [replaceMode, setReplaceMode] = useState(false)
+  const [replaceQuery, setReplaceQuery] = useState('')
   const [bulkModalOpen, setBulkModalOpen] = useState(false)
   const searchRef = useRef(null)
 
@@ -256,6 +258,21 @@ export default function ConversationTab({ scrollToId, onScrolled }) {
           <path d="M12 5v14M5 12h14" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
         </svg>
         User Message
+      </button>
+      <button
+        onClick={() => addMessage('branch')}
+        style={{
+          background: 'linear-gradient(135deg, #D97706, #B45309)',
+          color: '#fff', border: 'none', borderRadius: 10, padding: '9px 16px',
+          fontSize: 13, fontWeight: 600, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 6,
+          boxShadow: '0 2px 8px rgba(217,119,6,0.25)',
+        }}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+          <path d="M6 3v7a6 6 0 006 6h0M6 3l4-2M6 3l4 2M18 21v-7a6 6 0 00-6-6h0M18 21l-4-2M18 21l4-2" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+        Branch
       </button>
       <button
         onClick={() => setBulkModalOpen(true)}
@@ -359,61 +376,135 @@ export default function ConversationTab({ scrollToId, onScrolled }) {
         </div>
       </div>
 
-      {/* Search bar — only when there are messages */}
+      {/* Search / Find & Replace bar — only when there are messages */}
       {messages.length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ flex: 1, position: 'relative' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-              style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8', pointerEvents: 'none' }}>
-              <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2" />
-              <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-            <input
-              ref={searchRef}
-              type="text"
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setSearchMatchIdx(0) }}
-              placeholder="Search messages…"
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {/* Search row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {/* Find & Replace toggle */}
+            <button
+              onClick={() => { setReplaceMode((v) => !v); setReplaceQuery('') }}
+              title={replaceMode ? 'Hide replace' : 'Find & Replace'}
               style={{
-                width: '100%', paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9,
-                borderRadius: 10, border: '1px solid #E2E8F0',
-                fontSize: 13, color: '#1E293B', background: '#fff', outline: 'none',
-                fontFamily: 'inherit', transition: 'border-color 0.15s',
+                width: 28, height: 28, borderRadius: 7, border: '1px solid #E2E8F0',
+                background: replaceMode ? '#EFF6FF' : '#fff',
+                color: replaceMode ? '#2563EB' : '#94A3B8',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0, transition: 'all 0.15s',
               }}
-              onFocus={(e) => (e.target.style.borderColor = '#2563EB')}
-              onBlur={(e) => (e.target.style.borderColor = '#E2E8F0')}
-            />
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="2" />
+                <path d="M21 21l-4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <path d="M7 17v4M7 21h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
+
+            <div style={{ flex: 1, position: 'relative' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8', pointerEvents: 'none' }}>
+                <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2" />
+                <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+              <input
+                ref={searchRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setSearchMatchIdx(0) }}
+                placeholder="Search messages…"
+                style={{
+                  width: '100%', paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9,
+                  borderRadius: 10, border: '1px solid #E2E8F0',
+                  fontSize: 13, color: '#1E293B', background: '#fff', outline: 'none',
+                  fontFamily: 'inherit', transition: 'border-color 0.15s',
+                }}
+                onFocus={(e) => (e.target.style.borderColor = '#2563EB')}
+                onBlur={(e) => (e.target.style.borderColor = '#E2E8F0')}
+              />
+            </div>
+
+            {query && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                <span style={{ fontSize: 12, color: matchIndices.length ? '#64748B' : '#EF4444', fontWeight: 500 }}>
+                  {matchIndices.length ? `${clampedMatchIdx + 1}/${matchIndices.length}` : 'No matches'}
+                </span>
+                <button onClick={() => handleSearchNav(-1)} disabled={matchIndices.length === 0}
+                  style={{ background: '#F1F5F9', border: 'none', borderRadius: 6, width: 28, height: 28, cursor: matchIndices.length ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                    <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <button onClick={() => handleSearchNav(1)} disabled={matchIndices.length === 0}
+                  style={{ background: '#F1F5F9', border: 'none', borderRadius: 6, width: 28, height: 28, cursor: matchIndices.length ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <button onClick={() => { setSearchQuery(''); setReplaceQuery(''); setReplaceMode(false) }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', padding: 4 }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                    <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </div>
+            )}
           </div>
-          {query && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-              <span style={{ fontSize: 12, color: matchIndices.length ? '#64748B' : '#EF4444', fontWeight: 500 }}>
-                {matchIndices.length ? `${clampedMatchIdx + 1}/${matchIndices.length}` : 'No matches'}
-              </span>
-              <button
-                onClick={() => handleSearchNav(-1)}
-                disabled={matchIndices.length === 0}
-                style={{ background: '#F1F5F9', border: 'none', borderRadius: 6, width: 28, height: 28, cursor: matchIndices.length ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}
-              >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-                  <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+
+          {/* Replace row */}
+          {replaceMode && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 36 }}>
+              <div style={{ flex: 1, position: 'relative' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                  style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8', pointerEvents: 'none' }}>
+                  <path d="M7 17v4M7 21h4M3 7h18M3 12h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
+                <input
+                  type="text"
+                  value={replaceQuery}
+                  onChange={(e) => setReplaceQuery(e.target.value)}
+                  placeholder="Replace with…"
+                  style={{
+                    width: '100%', paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9,
+                    borderRadius: 10, border: '1px solid #E2E8F0',
+                    fontSize: 13, color: '#1E293B', background: '#fff', outline: 'none',
+                    fontFamily: 'inherit', transition: 'border-color 0.15s',
+                  }}
+                  onFocus={(e) => (e.target.style.borderColor = '#7C3AED')}
+                  onBlur={(e) => (e.target.style.borderColor = '#E2E8F0')}
+                />
+              </div>
+              <button
+                disabled={!query || matchIndices.length === 0}
+                onClick={() => {
+                  const targetIdx = matchIndices[clampedMatchIdx]
+                  const msg = messages[targetIdx]
+                  if (!msg) return
+                  const re = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
+                  updateMessage(msg.id, { text: msg.text.replace(re, replaceQuery) })
+                  setSearchMatchIdx(0)
+                }}
+                style={{
+                  padding: '8px 14px', borderRadius: 9, border: '1px solid #E2E8F0',
+                  background: query && matchIndices.length ? '#fff' : '#F8FAFC',
+                  color: query && matchIndices.length ? '#64748B' : '#CBD5E1',
+                  fontSize: 12, fontWeight: 600, cursor: query && matchIndices.length ? 'pointer' : 'not-allowed',
+                  flexShrink: 0, transition: 'all 0.15s',
+                }}
+              >
+                Replace
               </button>
               <button
-                onClick={() => handleSearchNav(1)}
-                disabled={matchIndices.length === 0}
-                style={{ background: '#F1F5F9', border: 'none', borderRadius: 6, width: 28, height: 28, cursor: matchIndices.length ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}
+                disabled={!query || matchIndices.length === 0}
+                onClick={() => { replaceInMessages(query, replaceQuery); setSearchQuery(''); setReplaceQuery(''); setReplaceMode(false) }}
+                style={{
+                  padding: '8px 14px', borderRadius: 9, border: 'none',
+                  background: query && matchIndices.length ? 'linear-gradient(135deg, #7C3AED, #6D28D9)' : '#E2E8F0',
+                  color: '#fff', fontSize: 12, fontWeight: 600,
+                  cursor: query && matchIndices.length ? 'pointer' : 'not-allowed',
+                  flexShrink: 0, transition: 'all 0.15s',
+                }}
               >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-                  <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-              <button
-                onClick={() => setSearchQuery('')}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', padding: 4 }}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                  <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                </svg>
+                Replace All ({matchIndices.length})
               </button>
             </div>
           )}

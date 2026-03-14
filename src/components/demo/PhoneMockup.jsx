@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import ChatArea from './ChatArea'
 import chatbotIcon from '../../assets/chatbot.svg?url'
 
-export default function PhoneMockup({ branding, messages, animatingIdx, botSpeaking, userSpeaking, isPlaying = true, onMessageClick, showBotTyping, disableAutoScroll = false }) {
+export default function PhoneMockup({ branding, messages, animatingIdx, botSpeaking, userSpeaking, isPlaying = true, onMessageClick, onBranchChoice, branchChoices, showBotTyping, disableAutoScroll = false }) {
   const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   const [recordSecs, setRecordSecs] = useState(0)
   const [justSent, setJustSent] = useState(false)
@@ -200,7 +200,7 @@ export default function PhoneMockup({ branding, messages, animatingIdx, botSpeak
             {branding.splashLogo && <img src={branding.splashLogo} alt="" style={{ width: 64, height: 64, objectFit: 'contain', marginTop: 8, opacity: 0.85 }} />}
           </div>
         ) : (
-          <ChatArea messages={displayMessages} animatingIdx={animatingIdx} branding={branding} onMessageClick={onMessageClick} topPad={94} showBotTyping={showBotTyping} disableAutoScroll={disableAutoScroll} />
+          <ChatArea messages={displayMessages} animatingIdx={animatingIdx} branding={branding} onMessageClick={onMessageClick} onBranchChoice={onBranchChoice} branchChoices={branchChoices} topPad={94} showBotTyping={showBotTyping} disableAutoScroll={disableAutoScroll} />
         )}
 
         {/* ── Voice input bar ── */}

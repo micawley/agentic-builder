@@ -141,3 +141,46 @@ body {
 .animate-in {
   animation: fadeSlideUp 0.35s ease forwards;
 }
+
+/* ── Animated demo backgrounds ── */
+@keyframes bgAurora {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes bgSunset {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes bgMidnight {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes bgCosmos {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.demo-bg-aurora {
+  background: linear-gradient(135deg, #0D2B1E, #0F3460, #1B4332, #1a1a2e, #0D2B1E);
+  background-size: 400% 400%;
+  animation: bgAurora 12s ease infinite;
+}
+.demo-bg-sunset {
+  background: linear-gradient(135deg, #1a0533, #7c1d6f, #c0392b, #f39c12, #7c1d6f, #1a0533);
+  background-size: 400% 400%;
+  animation: bgSunset 14s ease infinite;
+}
+.demo-bg-midnight {
+  background: linear-gradient(135deg, #020c1b, #0a192f, #172a45, #0d2137, #020c1b);
+  background-size: 400% 400%;
+  animation: bgMidnight 16s ease infinite;
+}
+.demo-bg-cosmos {
+  background: linear-gradient(135deg, #0f0c29, #302b63, #24243e, #4a1942, #0f0c29);
+  background-size: 400% 400%;
+  animation: bgCosmos 18s ease infinite;
+}

@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
 
-export default function DemoNavBar({ currentScene, total, onPrev, onNext, onReset, isPlaying, onPlayPause, onOpenSettings, presenterMode, onTogglePresenter, nextMessage, onJumpToScene }) {
+export default function DemoNavBar({ currentScene, total, onPrev, onNext, onReset, isPlaying, onPlayPause, onOpenSettings, presenterMode, onTogglePresenter, nextMessage, onJumpToScene, isRecording, onStartRecord, onStopRecord }) {
   const atStart = currentScene === 0
   const atEnd = currentScene === total
   const [editingScene, setEditingScene] = useState(false)
@@ -363,6 +363,31 @@ export default function DemoNavBar({ currentScene, total, onPrev, onNext, onRese
             ))}
           </div>
         </div>
+
+        {/* Record button */}
+        <button
+          onClick={isRecording ? onStopRecord : onStartRecord}
+          title={isRecording ? 'Stop recording & download' : 'Record demo as video'}
+          style={{
+            width: 36, height: 36, borderRadius: 9,
+            border: `1px solid ${isRecording ? '#FECACA' : '#E2E8F0'}`,
+            background: isRecording ? '#FEF2F2' : '#fff',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: isRecording ? '#EF4444' : '#64748B',
+            boxShadow: isRecording ? '0 0 0 3px rgba(239,68,68,0.15)' : '0 1px 4px rgba(0,0,0,0.06)',
+            transition: 'all 0.15s',
+          }}
+        >
+          {isRecording ? (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="4" y="4" width="16" height="16" rx="2" />
+            </svg>
+          ) : (
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="12" cy="12" r="7" />
+            </svg>
+          )}
+        </button>
 
         {/* Presenter mode toggle */}
         <button

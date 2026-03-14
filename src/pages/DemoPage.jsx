@@ -64,6 +64,41 @@ export default function DemoPage() {
   const audioRef = useRef(null)
   const audioCacheRef = useRef(new Map())
   const audioEndedRef = useRef(true)
+  const [isRecording, setIsRecording] = useState(false)
+  const mediaRecorderRef = useRef(null)
+  const recordedChunksRef = useRef([])
+
+  const startRecording = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: true })
+      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm'
+      const recorder = new MediaRecorder(stream, { mimeType })
+      recordedChunksRef.current = []
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunksRef.current.push(e.data) }
+      recorder.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `demo-${new Date().toISOString().slice(0, 10)}.webm`
+        a.click()
+        URL.revokeObjectURL(url)
+        stream.getTracks().forEach((t) => t.stop())
+        setIsRecording(false)
+      }
+      stream.getVideoTracks()[0]?.addEventListener('ended', () => {
+        if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop()
+        setIsRecording(false)
+      })
+      recorder.start()
+      mediaRecorderRef.current = recorder
+      setIsRecording(true)
+    } catch { setIsRecording(false) }
+  }, [])
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current?.state !== 'inactive') mediaRecorderRef.current?.stop()
+  }, [])
 
   const stopAudio = useCallback(() => {
     if (audioRef.current) {
@@ -111,10 +146,41 @@ export default function DemoPage() {
     } catch (e) { console.error('[ElevenLabs] fetch error', e); audioEndedRef.current = true; setUserSpeaking(false) }
   }, [stopAudio, setUserSpeaking])
 
+  const [branchChoices, setBranchChoices] = useState({}) // { [branchMsgId]: optionId }
+
   const messages = useMemo(() => config?.messages || [], [config])
   const total = messages.length
 
-  const shownMessages = messages.slice(0, currentScene)
+  // Build shown messages respecting branch choices (skip unchosen paths)
+  const shownMessages = useMemo(() => {
+    const result = []
+    let skipUntil = -1
+    for (let i = 0; i < currentScene && i < messages.length; i++) {
+      if (i < skipUntil) continue
+      const msg = messages[i]
+      result.push(msg)
+      if (msg.type === 'branch' && branchChoices[msg.id]) {
+        const chosenOpt = (msg.options || []).find((o) => o.id === branchChoices[msg.id])
+        if (chosenOpt?.targetId) {
+          const targetIdx = messages.findIndex((m) => m.id === chosenOpt.targetId)
+          if (targetIdx > i + 1) skipUntil = targetIdx
+        }
+      }
+    }
+    return result
+  }, [messages, currentScene, branchChoices])
+
+  // At a branch if current top of shown messages is a branch without a choice yet
+  const currentBranch = shownMessages.length > 0 && shownMessages[shownMessages.length - 1]?.type === 'branch'
+    && !branchChoices[shownMessages[shownMessages.length - 1]?.id]
+    ? shownMessages[shownMessages.length - 1]
+    : null
+
+  const onBranchChoice = useCallback((branchMsgId, optId, targetId) => {
+    setBranchChoices((prev) => ({ ...prev, [branchMsgId]: optId }))
+    const targetIdx = messages.findIndex((m) => m.id === targetId)
+    if (targetIdx >= 0) jumpToScene(targetIdx)
+  }, [messages, jumpToScene])
 
   const showBotTyping = animatingIdx >= 0 && messages[animatingIdx]?.type === 'bot'
 
@@ -161,7 +227,10 @@ export default function DemoPage() {
     const nextMsg = messages[currentScene]
     const nextIdx = currentScene
 
-    if (nextMsg?.type === 'bot') {
+    if (nextMsg?.type === 'branch') {
+      // Show branch immediately — no animation, auto-play will pause
+      setCurrentScene((s) => s + 1)
+    } else if (nextMsg?.type === 'bot') {
       audioEndedRef.current = false
       setAnimatingIdx(nextIdx)
       timerRef.current = setTimeout(() => {
@@ -247,6 +316,7 @@ export default function DemoPage() {
   // Auto-play: advance after animation finishes + audio ends (poll every 300ms)
   useEffect(() => {
     if (!isPlaying) return
+    if (currentBranch) { setIsPlaying(false); return } // pause at branch — wait for viewer choice
     if (currentScene >= total) { setIsPlaying(false); return }
     if (animatingIdx >= 0) return // wait for animation to finish
 
@@ -408,13 +478,19 @@ export default function DemoPage() {
 
   const hasContent = effectiveMode !== 'empty'
 
+  const isAnimBg = typeof branding.demoBackground === 'string' && branding.demoBackground.startsWith('anim:')
+  const animBgClass = isAnimBg ? `demo-bg-${branding.demoBackground.slice(5)}` : ''
+
   return (
     <div
+      className={animBgClass}
       style={{
         height: '100vh',
         display: 'flex',
         flexDirection: 'column',
-        background: branding.demoBackground
+        background: isAnimBg
+          ? undefined
+          : branding.demoBackground
           ? branding.demoBackground
           : `linear-gradient(135deg, ${branding.primaryColor}18 0%, ${branding.accentColor}12 100%), #E8EEF7`,
         overflow: 'hidden',
@@ -455,6 +531,8 @@ export default function DemoPage() {
               isPlaying={isPlaying}
               showBotTyping={showBotTyping}
               onMessageClick={(id) => { setIsPlaying(false); setScrollToId(id); setSidebarOpen(true) }}
+              onBranchChoice={onBranchChoice}
+              branchChoices={branchChoices}
             />
           )}
           {branding.shell === 'container' && (
@@ -466,6 +544,8 @@ export default function DemoPage() {
               userSpeaking={userSpeaking}
               showBotTyping={showBotTyping}
               onMessageClick={(id) => { setIsPlaying(false); setScrollToId(id); setSidebarOpen(true) }}
+              onBranchChoice={onBranchChoice}
+              branchChoices={branchChoices}
             />
           )}
           {branding.shell === 'webchat' && (
@@ -477,6 +557,8 @@ export default function DemoPage() {
               userSpeaking={userSpeaking}
               showBotTyping={showBotTyping}
               onMessageClick={(id) => { setIsPlaying(false); setScrollToId(id); setSidebarOpen(true) }}
+              onBranchChoice={onBranchChoice}
+              branchChoices={branchChoices}
             />
           )}
         </div>
@@ -583,6 +665,9 @@ export default function DemoPage() {
         onTogglePresenter={() => setPresenterMode(p => !p)}
         nextMessage={messages[currentScene]}
         onJumpToScene={jumpToScene}
+        isRecording={isRecording}
+        onStartRecord={startRecording}
+        onStopRecord={stopRecording}
       />
 
       {!presenterMode && (

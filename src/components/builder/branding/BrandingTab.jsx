@@ -630,6 +630,46 @@ export default function BrandingTab() {
               )
             })}
           </div>
+          {/* Animated backgrounds */}
+          {[
+            { label: 'Aurora', value: 'anim:aurora', from: '#0D4D2F', to: '#0F3460' },
+            { label: 'Sunset', value: 'anim:sunset', from: '#7c1d6f', to: '#c0392b' },
+            { label: 'Midnight', value: 'anim:midnight', from: '#020c1b', to: '#172a45' },
+            { label: 'Cosmos', value: 'anim:cosmos', from: '#0f0c29', to: '#302b63' },
+          ].map(({ label, value, from, to }) => {
+            const active = (branding.demoBackground ?? null) === value
+            return (
+              <button
+                key={label}
+                onClick={() => setBranding({ demoBackground: value })}
+                title={label}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 7,
+                  padding: '7px 12px', borderRadius: 8, cursor: 'pointer',
+                  border: active ? '2px solid #2563EB' : '2px solid #E2E8F0',
+                  background: active ? '#EFF6FF' : '#fff',
+                  fontSize: 12, fontWeight: active ? 600 : 400,
+                  color: active ? '#2563EB' : '#64748B',
+                  transition: 'all 0.15s',
+                }}
+              >
+                <span style={{
+                  width: 14, height: 14, borderRadius: 3, flexShrink: 0, display: 'inline-block',
+                  background: `linear-gradient(135deg, ${from}, ${to})`,
+                  border: '1px solid rgba(0,0,0,0.1)',
+                  position: 'relative', overflow: 'hidden',
+                }}>
+                  <span style={{
+                    position: 'absolute', inset: 0,
+                    background: 'linear-gradient(90deg, transparent 30%, rgba(255,255,255,0.25) 50%, transparent 70%)',
+                    animation: 'bgAurora 2s ease infinite',
+                  }} />
+                </span>
+                {label} ✦
+              </button>
+            )
+          })}
+
           {/* Custom color picker row */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <label style={{ ...labelStyle, margin: 0, flexShrink: 0 }}>Custom</label>

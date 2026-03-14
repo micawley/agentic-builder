@@ -2,7 +2,7 @@ import { useBuilder } from '../../../store/BuilderContext'
 import StepRow from './StepRow'
 
 export default function StageCard({ stage, index }) {
-  const { removeStage, updateStageName, updateStage, addStep } = useBuilder()
+  const { removeStage, updateStageName, updateStage, addStep, duplicateStage } = useBuilder()
 
   return (
     <div
@@ -71,6 +71,25 @@ export default function StageCard({ stage, index }) {
           onBlur={(e) => (e.target.style.borderColor = '#E2E8F0')}
           placeholder="Stage name"
         />
+        {/* Duplicate */}
+        <button
+          onClick={() => duplicateStage(stage.id)}
+          title="Duplicate stage"
+          style={{
+            width: 32, height: 32, borderRadius: 8, border: 'none',
+            background: 'transparent', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#CBD5E1', transition: 'all 0.15s',
+          }}
+          onMouseOver={(e) => { e.currentTarget.style.background = '#F1F5F9'; e.currentTarget.style.color = '#64748B' }}
+          onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#CBD5E1' }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <rect x="8" y="8" width="13" height="13" rx="2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            <path d="M16 8V5a2 2 0 00-2-2H5a2 2 0 00-2 2v9a2 2 0 002 2h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </button>
+
         <button
           onClick={() => removeStage(stage.id)}
           style={{

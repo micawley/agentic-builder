@@ -1,7 +1,7 @@
 import ChatArea from './ChatArea'
 import chatbotIcon from '../../assets/chatbot.svg?url'
 
-export default function ContainerShell({ branding, messages, animatingIdx, botSpeaking, userSpeaking, onMessageClick, showBotTyping, disableAutoScroll = false }) {
+export default function ContainerShell({ branding, messages, animatingIdx, botSpeaking, userSpeaking, onMessageClick, onBranchChoice, branchChoices, showBotTyping, disableAutoScroll = false }) {
   const color = branding.primaryColor || '#2563EB'
   const accentColor = branding.accentColor || '#7C3AED'
   const dark = branding.darkShell
@@ -107,7 +107,7 @@ export default function ContainerShell({ branding, messages, animatingIdx, botSp
             )}
           </div>
         ) : (
-          <ChatArea messages={messages} animatingIdx={animatingIdx} branding={branding} onMessageClick={onMessageClick} showBotTyping={showBotTyping} disableAutoScroll={disableAutoScroll} />
+          <ChatArea messages={messages} animatingIdx={animatingIdx} branding={branding} onMessageClick={onMessageClick} onBranchChoice={onBranchChoice} branchChoices={branchChoices} showBotTyping={showBotTyping} disableAutoScroll={disableAutoScroll} />
         )}
       </div>
 

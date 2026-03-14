@@ -8,7 +8,7 @@ import ConversationTab from '../components/builder/conversation/ConversationTab'
 
 export default function BuilderPage() {
   const [activeTab, setActiveTab] = useState('branding')
-  const isBranding = activeTab === 'branding'
+  const [scrollToId, setScrollToId] = useState(null)
 
   return (
     <div style={{ minHeight: '100vh', background: '#E8EEF7' }}>
@@ -16,10 +16,9 @@ export default function BuilderPage() {
 
       <div
         style={{
-          maxWidth: isBranding ? 1140 : 860,
+          maxWidth: 1140,
           margin: '0 auto',
           padding: '32px 24px 80px',
-          transition: 'max-width 0.3s ease',
         }}
       >
         <TabNav activeTab={activeTab} onTabChange={setActiveTab} />
@@ -29,11 +28,11 @@ export default function BuilderPage() {
           <div style={{ flex: 1, minWidth: 0 }}>
             {activeTab === 'branding'      && <BrandingTab />}
             {activeTab === 'stages'        && <StagesTab />}
-            {activeTab === 'conversation'  && <ConversationTab />}
+            {activeTab === 'conversation'  && <ConversationTab scrollToId={scrollToId} onScrolled={() => setScrollToId(null)} />}
           </div>
 
-          {/* Sticky live preview — branding tab only */}
-          {isBranding && <BrandingPreviewPanel />}
+          {/* Sticky live preview — always visible */}
+          <BrandingPreviewPanel activeTab={activeTab} />
         </div>
       </div>
     </div>

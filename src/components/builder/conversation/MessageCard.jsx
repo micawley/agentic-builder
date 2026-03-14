@@ -3,7 +3,8 @@ import { useBuilder } from '../../../store/BuilderContext'
 import PanelConfig from './panelconfig/PanelConfig'
 
 export default function MessageCard({ message, index, scrollToId, onScrolled }) {
-  const { state, removeMessage, updateMessage } = useBuilder()
+  const { state, removeMessage, updateMessage, duplicateMessage } = useBuilder()
+  const isBranch = message.type === 'branch'
   const isBot = message.type === 'bot'
   const cardRef = useRef(null)
   const [collapsed, setCollapsed] = useState(false)
@@ -69,20 +70,20 @@ export default function MessageCard({ message, index, scrollToId, onScrolled }) 
             overflow: 'hidden',
           }}
         >
-          {['bot', 'user'].map((type) => {
+          {['bot', 'user', 'branch'].map((type) => {
             const isActive = message.type === type
+            const color = type === 'bot' ? '#2563EB' : type === 'user' ? '#7C3AED' : '#D97706'
             return (
               <button
                 key={type}
-                onClick={() => updateMessage(message.id, { type })}
+                onClick={() => updateMessage(message.id, type === 'branch'
+                  ? { type, options: message.options || [{ id: `opt_${Date.now()}a`, label: 'Option A', targetId: '' }, { id: `opt_${Date.now()}b`, label: 'Option B', targetId: '' }] }
+                  : { type }
+                )}
                 style={{
                   padding: '5px 14px',
                   border: 'none',
-                  background: isActive
-                    ? type === 'bot'
-                      ? '#2563EB'
-                      : '#7C3AED'
-                    : 'transparent',
+                  background: isActive ? color : 'transparent',
                   color: isActive ? '#fff' : '#94A3B8',
                   fontSize: 12,
                   fontWeight: isActive ? 600 : 400,
@@ -91,7 +92,7 @@ export default function MessageCard({ message, index, scrollToId, onScrolled }) 
                   textTransform: 'capitalize',
                 }}
               >
-                {type}
+                {type === 'branch' ? '⑂ Branch' : type}
               </button>
             )
           })}
@@ -115,6 +116,25 @@ export default function MessageCard({ message, index, scrollToId, onScrolled }) 
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
             style={{ transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 0.2s ease' }}>
             <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+
+        {/* Duplicate */}
+        <button
+          onClick={() => duplicateMessage(message.id)}
+          title="Duplicate message"
+          style={{
+            width: 28, height: 28, borderRadius: 7, border: 'none',
+            background: 'transparent', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#CBD5E1', transition: 'all 0.15s',
+          }}
+          onMouseOver={(e) => { e.currentTarget.style.background = '#F1F5F9'; e.currentTarget.style.color = '#64748B' }}
+          onMouseOut={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#CBD5E1' }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+            <rect x="8" y="8" width="13" height="13" rx="2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            <path d="M16 8V5a2 2 0 00-2-2H5a2 2 0 00-2 2v9a2 2 0 002 2h3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
           </svg>
         </button>
 
@@ -163,8 +183,70 @@ export default function MessageCard({ message, index, scrollToId, onScrolled }) 
         </div>
       )}
 
+      {/* Branch body */}
+      {!collapsed && isBranch && (
+        <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <p style={{ fontSize: 12, color: '#94A3B8', fontWeight: 500 }}>
+            Viewer picks one — demo jumps to the target message.
+          </p>
+          {(message.options || []).map((opt, oi) => (
+            <div key={opt.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#D97706', background: '#FEF3C7', borderRadius: 6, padding: '3px 8px', flexShrink: 0 }}>
+                {String.fromCharCode(65 + oi)}
+              </span>
+              <input
+                type="text"
+                value={opt.label}
+                onChange={(e) => {
+                  const opts = message.options.map((o) => o.id === opt.id ? { ...o, label: e.target.value } : o)
+                  updateMessage(message.id, { options: opts })
+                }}
+                placeholder="Option label…"
+                style={{ flex: 1, padding: '7px 10px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: 12, color: '#1E293B', outline: 'none', fontFamily: 'inherit' }}
+                onFocus={(e) => (e.target.style.borderColor = '#D97706')}
+                onBlur={(e) => (e.target.style.borderColor = '#E2E8F0')}
+              />
+              <select
+                value={opt.targetId}
+                onChange={(e) => {
+                  const opts = message.options.map((o) => o.id === opt.id ? { ...o, targetId: e.target.value } : o)
+                  updateMessage(message.id, { options: opts })
+                }}
+                style={{ padding: '7px 8px', borderRadius: 8, border: '1px solid #E2E8F0', fontSize: 11, color: '#475569', outline: 'none', cursor: 'pointer', background: '#fff', maxWidth: 130 }}
+              >
+                <option value="">→ nowhere</option>
+                {state.messages.filter((m) => m.id !== message.id).map((m) => (
+                  <option key={m.id} value={m.id}>
+                    → #{state.messages.indexOf(m) + 1} {m.type === 'branch' ? '(branch)' : (m.text?.slice(0, 20) || `(${m.type})`)}
+                  </option>
+                ))}
+              </select>
+              {message.options.length > 2 && (
+                <button
+                  onClick={() => updateMessage(message.id, { options: message.options.filter((o) => o.id !== opt.id) })}
+                  style={{ width: 22, height: 22, borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer', color: '#CBD5E1', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                  onMouseOver={(e) => { e.currentTarget.style.color = '#EF4444' }}
+                  onMouseOut={(e) => { e.currentTarget.style.color = '#CBD5E1' }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" /></svg>
+                </button>
+              )}
+            </div>
+          ))}
+          {(message.options || []).length < 5 && (
+            <button
+              onClick={() => updateMessage(message.id, { options: [...(message.options || []), { id: `opt_${Date.now()}`, label: `Option ${String.fromCharCode(65 + (message.options || []).length)}`, targetId: '' }] })}
+              style={{ alignSelf: 'flex-start', fontSize: 12, fontWeight: 500, color: '#D97706', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', display: 'flex', alignItems: 'center', gap: 4 }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" /></svg>
+              Add option
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Body */}
-      {!collapsed && (
+      {!collapsed && !isBranch && (
       <div style={{ padding: '14px 16px' }}>
         <textarea
           value={message.text}

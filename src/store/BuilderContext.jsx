@@ -143,14 +143,9 @@ function reducer(state, action) {
       }
 
     case 'INSERT_MESSAGE': {
-      const newMsg = {
-        id: genId('msg'),
-        type: action.msgType,
-        text: '',
-        speak: true,
-        advanceStep: false,
-        panel: { mode: 'same', badges: [], caseSearch: { category: '', types: [], match: '', badges: [], isNew: true }, stageId: '', stepId: '' },
-      }
+      const newMsg = action.msgType === 'branch'
+        ? { id: genId('msg'), type: 'branch', options: [{ id: genId('opt'), label: 'Option A', targetId: '' }, { id: genId('opt'), label: 'Option B', targetId: '' }] }
+        : { id: genId('msg'), type: action.msgType, text: '', speak: true, advanceStep: false, panel: { mode: 'same', badges: [], caseSearch: { category: '', types: [], match: '', badges: [], isNew: true }, stageId: '', stepId: '' } }
       const msgs = [...state.messages]
       msgs.splice(action.index, 0, newMsg)
       return { ...state, messages: msgs }
@@ -163,21 +158,12 @@ function reducer(state, action) {
       return { ...state, messages: arr }
     }
 
-    case 'ADD_MESSAGE':
-      return {
-        ...state,
-        messages: [
-          ...state.messages,
-          {
-            id: genId('msg'),
-            type: action.msgType,
-            text: '',
-            speak: true,
-            advanceStep: false,
-            panel: { mode: 'same', badges: [], caseSearch: { category: '', types: [], match: '', badges: [], isNew: true }, stageId: '', stepId: '' },
-          },
-        ],
-      }
+    case 'ADD_MESSAGE': {
+      const newMsg = action.msgType === 'branch'
+        ? { id: genId('msg'), type: 'branch', options: [{ id: genId('opt'), label: 'Option A', targetId: '' }, { id: genId('opt'), label: 'Option B', targetId: '' }] }
+        : { id: genId('msg'), type: action.msgType, text: '', speak: true, advanceStep: false, panel: { mode: 'same', badges: [], caseSearch: { category: '', types: [], match: '', badges: [], isNew: true }, stageId: '', stepId: '' } }
+      return { ...state, messages: [...state.messages, newMsg] }
+    }
 
     case 'BULK_ADD_MESSAGES': {
       const newMsgs = action.messages.map((m) => ({
@@ -365,6 +351,44 @@ function reducer(state, action) {
       return { ...state, stages: arr }
     }
 
+    case 'DUPLICATE_MESSAGE': {
+      const idx = state.messages.findIndex((m) => m.id === action.id)
+      if (idx === -1) return state
+      const copy = { ...state.messages[idx], id: genId('msg') }
+      const msgs = [...state.messages]
+      msgs.splice(idx + 1, 0, copy)
+      return { ...state, messages: msgs }
+    }
+
+    case 'DUPLICATE_STAGE': {
+      const idx = state.stages.findIndex((s) => s.id === action.id)
+      if (idx === -1) return state
+      const orig = state.stages[idx]
+      const copy = {
+        ...orig,
+        id: genId('stage'),
+        name: orig.name + ' (copy)',
+        steps: orig.steps.map((step) => ({ ...step, id: genId('step') })),
+      }
+      const stages = [...state.stages]
+      stages.splice(idx + 1, 0, copy)
+      return { ...state, stages }
+    }
+
+    case 'REPLACE_IN_MESSAGES': {
+      const { find, replace } = action
+      if (!find) return state
+      const re = new RegExp(find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
+      return {
+        ...state,
+        messages: state.messages.map((m) =>
+          typeof m.text === 'string' && re.test(m.text)
+            ? { ...m, text: m.text.replace(re, replace) }
+            : m
+        ),
+      }
+    }
+
     case 'SAVE_PRESET': {
       const preset = { id: genId('preset'), name: action.name, branding: { ...state.branding } }
       return { ...state, presets: [...(state.presets || []), preset] }
@@ -469,6 +493,9 @@ export function BuilderProvider({ children }) {
     updateStageStep: (msgId, stageId, stepId) =>
       dispatch({ type: 'UPDATE_STAGE_STEP', msgId, stageId, stepId }),
     reorderStages: (from, to) => dispatch({ type: 'REORDER_STAGES', from, to }),
+    duplicateMessage: (id) => dispatch({ type: 'DUPLICATE_MESSAGE', id }),
+    duplicateStage: (id) => dispatch({ type: 'DUPLICATE_STAGE', id }),
+    replaceInMessages: (find, replace) => dispatch({ type: 'REPLACE_IN_MESSAGES', find, replace }),
     savePreset: (name) => dispatch({ type: 'SAVE_PRESET', name }),
     loadPreset: (branding) => dispatch({ type: 'LOAD_PRESET', branding }),
     deletePreset: (id) => dispatch({ type: 'DELETE_PRESET', id }),

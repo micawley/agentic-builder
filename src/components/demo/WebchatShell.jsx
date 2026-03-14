@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import ChatArea from './ChatArea'
 import chatbotIcon from '../../assets/chatbot.svg?url'
 
-export default function WebchatShell({ branding, messages, animatingIdx, botSpeaking, userSpeaking, onMessageClick, showBotTyping, disableAutoScroll = false }) {
+export default function WebchatShell({ branding, messages, animatingIdx, botSpeaking, userSpeaking, onMessageClick, onBranchChoice, branchChoices, showBotTyping, disableAutoScroll = false }) {
   const color = branding.primaryColor || '#2563EB'
   const dark = branding.darkShell
   const chatBg     = dark ? '#0F172A' : '#FAFAFA'
@@ -147,7 +147,7 @@ export default function WebchatShell({ branding, messages, animatingIdx, botSpea
         </div>
       ) : (
         <div style={{ flex: 1, background: chatBg, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-          <ChatArea messages={displayMessages} animatingIdx={animatingIdx} branding={branding} onMessageClick={onMessageClick} showBotTyping={showBotTyping} disableAutoScroll={disableAutoScroll} />
+          <ChatArea messages={displayMessages} animatingIdx={animatingIdx} branding={branding} onMessageClick={onMessageClick} onBranchChoice={onBranchChoice} branchChoices={branchChoices} showBotTyping={showBotTyping} disableAutoScroll={disableAutoScroll} />
         </div>
       )}
 

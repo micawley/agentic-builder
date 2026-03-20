@@ -176,12 +176,6 @@ export default function DemoPage() {
     ? shownMessages[shownMessages.length - 1]
     : null
 
-  const onBranchChoice = useCallback((branchMsgId, optId, targetId) => {
-    setBranchChoices((prev) => ({ ...prev, [branchMsgId]: optId }))
-    const targetIdx = messages.findIndex((m) => m.id === targetId)
-    if (targetIdx >= 0) jumpToScene(targetIdx)
-  }, [messages, jumpToScene])
-
   const showBotTyping = animatingIdx >= 0 && messages[animatingIdx]?.type === 'bot'
 
   const jumpToScene = useCallback((n) => {
@@ -195,6 +189,12 @@ export default function DemoPage() {
     setUserSpeaking(false)
     setCurrentScene(n)
   }, [stopAudio, setUserSpeaking])
+
+  const onBranchChoice = useCallback((branchMsgId, optId, targetId) => {
+    setBranchChoices((prev) => ({ ...prev, [branchMsgId]: optId }))
+    const targetIdx = messages.findIndex((m) => m.id === targetId)
+    if (targetIdx >= 0) jumpToScene(targetIdx)
+  }, [messages, jumpToScene])
 
   const goReset = useCallback(() => {
     if (autoPlayTimerRef.current) { clearTimeout(autoPlayTimerRef.current); autoPlayTimerRef.current = null }

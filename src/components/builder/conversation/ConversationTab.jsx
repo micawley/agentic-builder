@@ -386,18 +386,15 @@ export default function ConversationTab({ scrollToId, onScrolled }) {
               onClick={() => { setReplaceMode((v) => !v); setReplaceQuery('') }}
               title={replaceMode ? 'Hide replace' : 'Find & Replace'}
               style={{
-                width: 28, height: 28, borderRadius: 7, border: '1px solid #E2E8F0',
+                height: 28, borderRadius: 7, border: '1px solid #E2E8F0',
                 background: replaceMode ? '#EFF6FF' : '#fff',
                 color: replaceMode ? '#2563EB' : '#94A3B8',
                 cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 flexShrink: 0, transition: 'all 0.15s',
+                padding: '0 10px', fontSize: 12, fontWeight: 500,
               }}
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                <circle cx="10" cy="10" r="7" stroke="currentColor" strokeWidth="2" />
-                <path d="M21 21l-4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                <path d="M7 17v4M7 21h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
+              Replace
             </button>
 
             <div style={{ flex: 1, position: 'relative' }}>
